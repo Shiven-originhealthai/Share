@@ -1,9 +1,11 @@
 'use client';
 import React, { useState } from 'react';
 import { Menu, X } from 'lucide-react'; // Install Lucide: npm install lucide-react
-
+import { usePosting } from '@/store/Posting';
 export default function Navbar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const post = usePosting((state)=>state.Shared)
+
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -11,7 +13,8 @@ export default function Navbar() {
 
   const onShare = () => {
     console.log('sharing');
-    console.log(localStorage.getItem('selected'))
+    post((true));
+
   };
 
   return (
@@ -40,7 +43,7 @@ export default function Navbar() {
         {/* Hamburger Menu - Visible on Mobile */}
         <button
           onClick={toggleSidebar}
-          className="sm:hidden text-white focus:outline-none"
+          className="sm:hidden text-white focus:outline-none transition-all duration-300"
         >
           {sidebarOpen ? <X size={28} /> : <Menu size={28} />}
         </button>
@@ -48,20 +51,19 @@ export default function Navbar() {
 
       {/* Sidebar Drawer for Mobile */}
       {sidebarOpen && (
-        <div className="sm:hidden bg-blue-800 text-white px-6 py-4 flex flex-col gap-4 transition-all duration-300">
-          <button className="bg-blue-100 text-blue-600 font-bold px-5 py-2 rounded hover:bg-sky-700 hover:text-white transition">
+        <div className="sm:hidden bg-blue-800 text-white px-9 py-4 flex flex-col gap-4 transition-all duration-300">
+          <button className="bg-blue-100 text-blue-600 font-bold px-3 py-2 rounded hover:bg-sky-700 hover:text-white transition">
             Go to the report
           </button>
-          <button className="bg-blue-100 text-blue-600 font-bold px-5 py-2 rounded hover:bg-sky-700 hover:text-white transition">
+          <button className="bg-blue-100 text-blue-600 font-bold px-1 py-2 rounded hover:bg-sky-700 hover:text-white transition">
             Print
           </button>
           <button
             onClick={onShare}
-            className="bg-blue-100 text-blue-600 font-bold px-5 py-2 rounded hover:bg-sky-700 hover:text-white transition"
+            className="bg-blue-100 text-blue-600 font-bold px-3 py-2 rounded hover:bg-sky-700 hover:text-white transition"
           >
             Share
           </button>
-          <p className="text-lg font-bold">JOHN DOE</p>
         </div>
       )}
     </>

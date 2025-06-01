@@ -3,8 +3,8 @@ import MediaGrid from "@/components/MediaGrid";
 
 export default function Home() {
   return (
-    <div className="min-h-screen">
-      <MediaGrid/>
+    <div>
+    <MediaGrid/>
     </div>
   );
 }

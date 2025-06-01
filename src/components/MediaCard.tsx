@@ -1,7 +1,7 @@
 'use client';
+
 import React, { useEffect, useRef } from 'react';
-import cornerstone from 'cornerstone-core';
-import { initializeCornerstone } from '@/lib/cornerstoneInit';
+import { usePosting } from '@/store/Posting';
 
 type MediaCardProps = {
   src: string;
@@ -12,52 +12,69 @@ type MediaCardProps = {
 
 export default function MediaCard({ src, name, selected, onSelect }: MediaCardProps) {
   const elementRef = useRef<HTMLDivElement | null>(null);
+  const isPosting = usePosting((state) => state.isposting);
 
   useEffect(() => {
-    initializeCornerstone();
-    if (!elementRef.current) return;
+    if (typeof window === 'undefined') return;
 
-    cornerstone.enable(elementRef.current);
+    let cornerstone: any;
+    let resizeObserver: ResizeObserver;
 
-    const imageId = `wadouri:${window.location.origin}${src}`;
+    const load = async () => {
+      cornerstone = (await import('cornerstone-core')).default;
+      const { initializeCornerstone } = await import('@/lib/cornerstoneInit');
 
-    cornerstone
-      .loadImage(imageId)
-      .then((image: any) => {
-        cornerstone.displayImage(elementRef.current!, image);
-      })
-      .catch((err: unknown) => {
+      initializeCornerstone();
+
+      if (!elementRef.current) return;
+
+      cornerstone.enable(elementRef.current);
+
+      const imageId = `wadouri:${window.location.origin}${src}`;
+
+      try {
+        const image = await cornerstone.loadImage(imageId);
+        if (!elementRef.current) return;
+        cornerstone.displayImage(elementRef.current, image);
+
+        resizeObserver = new ResizeObserver(() => {
+          if (elementRef.current) {
+            cornerstone.resize(elementRef.current, true);
+          }
+        });
+        resizeObserver.observe(elementRef.current);
+      } catch (err) {
         console.error('Failed to load DICOM image:', name, err);
-      });
+      }
+    };
+
+    load();
+
+    return () => {
+      if (resizeObserver && elementRef.current) {
+        resizeObserver.disconnect();
+      }
+      if (cornerstone && elementRef.current) {
+        cornerstone.disable(elementRef.current);
+      }
+    };
   }, [src]);
 
-  const cardClasses = [
-    'cursor-pointer',
-    'border',
-    'rounded-xl',
-    'overflow-hidden',
-    'transition-all',
-    'duration-200',
-    'shadow-md',
-    'flex',
-    'items-center',
-    'justify-center',
-    'w-full',
-    'aspect-[4/3]',
-    'max-w-[190px]',      // Mobile
-    'sm:max-w-[260px]',   // Small screens
-    'md:max-w-[300px]',   // Medium screens
-    'lg:max-w-[340px]',   // Large screens
-    'xl:max-w-[380px]',   // Extra large
-    selected ? 'ring-4 ring-blue-500 scale-105' : 'hover:ring-2 hover:ring-blue-300'
-  ].join(' ');
-
   return (
-    <div onClick={() => onSelect(name)} className={cardClasses}>
-      <div
-        ref={elementRef}
-        className="w-full h-full bg-black flex items-center justify-center "
-      />
+    <div
+      onClick={() => onSelect(name)}
+      className={`cursor-pointer w-full aspect-[4/3] transition-all duration-200 ${
+        selected && !isPosting
+          ? 'ring-4 ring-blue-500 scale-105'
+          : 'hover:ring-2 hover:ring-blue-900 border rounded'
+      }`}
+    >
+      <div className="border rounded-xl overflow-hidden shadow-md w-full h-full relative">
+        <div ref={elementRef} className="absolute inset-0 bg-black" />
+        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-1 truncate">
+          {name}
+        </div>
+      </div>
     </div>
   );
 }
