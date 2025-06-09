@@ -13,10 +13,9 @@ export default function MediaGridServer() {
     { src: '/dicoms/brain.jpg', name: 'image9.dcm' },
     { src: '/dicoms/brain.jpg', name: 'image10.dcm' },
     { src: '/dicoms/brain.jpg', name: 'image11.dcm' },
+    { src: '/dicoms/brain.jpg', name: 'image12.dcm' },
   ];
   return (
-    <div>
       <MediaGrid dicomImages={dicomImages}/>
-    </div>
   )
 }

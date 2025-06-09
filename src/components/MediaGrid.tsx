@@ -1,7 +1,6 @@
 'use client';
-
 import React, { useEffect, useState } from 'react'; //used for maintaining various rendering states
-import dynamic from 'next/dynamic'; 
+import dynamic from 'next/dynamic';
 import { useMediaStore } from '@/store/UserMediaStore'; //Importing media store for storing the url or location for the DICOM images
 import { useQrCodeUrl } from '@/store/Qrcode'; //Importing qr code url for storing the url for the generated qr code from backend
 import { usePosting } from '@/store/Posting'; // Imported usePosting function to maintain the share button click state and the corrosponding media selected 
@@ -10,26 +9,43 @@ import SelectedMobileMediaGrid from '@/app/share/[token]/page'; // Imported the 
 import MediaCard from './MediaCard';
 //const MediaCard = dynamic(() => import('./MediaCard'), { ssr: false });
 
-interface MediaGrid {
+interface MediaGridProps {
   dicomImages: { src: string; name: string }[];  // creating a type for media grid client 
 }
+/*const dicomImages = [
+  { src: '/dicoms/brain.jpg', name: 'image1.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image2.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image3.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image4.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image5.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image6.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image7.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image8.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image9.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image10.dcm' },
+  { src: '/dicoms/brain.jpg', name: 'image11.dcm' },
+];*/
 
-
-export default function MediaGrid({ dicomImages }: MediaGrid) {
+export default function MediaGrid({ dicomImages }: MediaGridProps) {
   const selectedImage = useMediaStore((state) => state.selectedPaths); // Calls for the array from store where the paths have benn stored for the media files 
   const togglePath = useMediaStore((state) => state.togglePath); // Calls for the toggle path function where it selectively checks for the array if the path doesn't exists
   const isPosting = usePosting((state) => state.isposting); // Calls for checking the posting state checks based on the clicks of share button
   const toggleUrl = useQrCodeUrl((state) => state.toggeUrl);
   const url = useQrCodeUrl((state) => state.url);
+  const clearPaths = useMediaStore((state) => state.clearPaths)
+  //console.log(dicomImages)
 
   const [token, setToken] = useState('');
   const isMobile = useIsMobile();
   /* This function deals with sending requests to api for getting response on string array
   (image,id or image name bssed on database key ) 
   passed to generate tokens for securing routes*/
+  useEffect(() => {
+    clearPaths();
+  }, [])
   async function postRequest(arr: string[]) {
     try {
-      const response = await fetch('http://localhost:3001/images', {  
+      const response = await fetch('http://localhost:3001/images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ arr }),
@@ -45,14 +61,13 @@ export default function MediaGrid({ dicomImages }: MediaGrid) {
       console.error('Error sending images:', err);
     }
   }
-/*Below function deals with checking for whether the share button is clicked or not and media files are selected or not in the array */ 
+  /*Below function deals with checking for whether the share button is clicked or not and media files are selected or not in the array */
   useEffect(() => {
     if (isPosting && selectedImage.length > 0) {
       console.log('Posting started');
       postRequest(selectedImage);
     }
   }, [isPosting, selectedImage]);
-
 
   // RenderMediaFrid function runs the funtion and display the style grid component for the media files that are being fetched(currently without database)
   const renderMediaGrid = () => (
@@ -75,7 +90,7 @@ export default function MediaGrid({ dicomImages }: MediaGrid) {
   // Conditionally render the various components based on whether its a small screen device,medium or a big screen device 
   return (
     <div className="p-4 w-full flex justify-center">
-      {isMobile ? <SelectedMobileMediaGrid /> : renderMediaGrid() }  
+      {isMobile ? <SelectedMobileMediaGrid /> : renderMediaGrid()}
       {showQRSection && (// for displaying the qr section
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50 px-2">
           <div className="relative bg-blue-900 text-white rounded-xl shadow-lg p-4 w-full max-w-3xl flex flex-col sm:flex-row gap-6 items-center justify-center max-h-[90vh] overflow-y-auto">
@@ -101,7 +116,7 @@ export default function MediaGrid({ dicomImages }: MediaGrid) {
                 className="px-2 py-2 border border-gray-300 rounded text-black w-full focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               />
               <button className="bg-blue-600 text-white px-2 py-2 rounded hover:bg-blue-500">
-                Send Mail 
+                Send Mail
               </button>
             </div>
           </div>

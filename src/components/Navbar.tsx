@@ -1,67 +1,71 @@
 'use client';
-import React, { useState } from 'react'; // Imported the useState hook for maintaining the state of the sidebar in ss view 
-import { Menu, X } from 'lucide-react'; // Install Lucide: npm install lucide-react used for design of sidebar icon
+import React, { useState } from 'react';
+import { Menu, X } from 'lucide-react';
 import { usePosting } from '@/store/Posting';
 import { useMediaStore } from '@/store/UserMediaStore';
+
 export default function Navbar() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const post = usePosting((state) => state.Shared) // function for maintaing the state of share button 
-  const selectedArray = useMediaStore((state) => state.selectedPaths)
-  const clearPaths = useMediaStore((state) => state.clearPaths)
-
+  const post = usePosting((state) => state.Shared);
+  const selectedArray = useMediaStore((state) => state.selectedPaths);
+  const clearPaths = useMediaStore((state) => state.clearPaths);
 
   const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen); // used for maintaining side bar status
+    setSidebarOpen(!sidebarOpen);
   };
 
-  // changes the state of share based n the click event of share button
   const onShare = () => {
     console.log('sharing');
-    post((true));
-
+    post(true);
   };
+
   const onCancel = () => {
     console.log('cancelling');
-    console.log(selectedArray.length)
     clearPaths();
-
-  }
+  };
 
   return (
     <>
       {/* Navbar */}
-      <nav className="w-full bg-blue-900 text-white px-4 sm:px-6 py-4 flex justify-between items-center transition-all duration-300" >
+      <nav className="w-full bg-blue-900 text-white px-4 sm:px-6 py-4 flex items-center transition-all duration-300">
+        {/* Title */}
         <h1 className="text-xl font-bold">Feature</h1>
 
-        {/* Desktop Buttons */}
-        <div className="hidden sm:flex flex-row items-center gap-4">
-          <button className="bg-blue-100 text-blue-600 font-bold px-5 py-2 rounded hover:bg-sky-700 hover:text-white transition cursor-pointer">
+        {/* Buttons - centered and optimized */}
+        <div className="hidden sm:flex flex-1 justify-center items-center gap-3">
+          <button className="bg-blue-100 text-blue-600 font-semibold px-3 py-1.5 rounded hover:bg-sky-700 hover:text-white transition cursor-pointer whitespace-nowrap">
             Go to the report
           </button>
-          <button className="bg-blue-100 text-blue-600 font-bold px-5 py-2 rounded hover:bg-sky-700 hover:text-white transition cursor-pointer">
+          <button className="bg-blue-100 text-blue-600 font-semibold px-3 py-1.5 rounded hover:bg-sky-700 hover:text-white transition cursor-pointer whitespace-nowrap">
             Print
           </button>
           <button
             onClick={onShare}
-            className="bg-blue-100 text-blue-600 font-bold px-5 py-2 rounded hover:bg-sky-700 hover:text-white transition cursor-pointer"
-            data-testid='shareButton'
+            className="bg-blue-100 text-blue-600 font-semibold px-3 py-1.5 rounded hover:bg-sky-700 hover:text-white transition cursor-pointer whitespace-nowrap"
+            data-testid="shareButton"
           >
             Share
           </button>
-          {selectedArray.length > 0 && <button
-            onClick={onCancel}
-            className="bg-blue-100 text-blue-600 font-bold px-3 py-2 rounded hover:bg-sky-700 hover:text-white transition cursor-pointer "
-          >
-            Cancel
-          </button>}
-
+          {selectedArray.length > 0 && (
+            <button
+              onClick={onCancel}
+              className="bg-blue-100 text-blue-600 font-semibold px-2 py-1.5 rounded hover:bg-sky-700 hover:text-white transition cursor-pointer whitespace-nowrap"
+            >
+              Cancel
+            </button>
+          )}
         </div>
-        <p className="text-lg font-bold ml-4">Shiven Dashora</p>{/*User Meta Data Section* /}
 
-        {/* Hamburger Menu - Visible on Mobile */}
+        {/* User Info aligned right */}
+        <div className="flex items-center gap-6 whitespace-nowrap ml-auto">
+          <p className="text-lg font-bold">Shiven Dashora</p>
+        </div>
+
+        {/* Hamburger Menu for Mobile */}
         <button
           onClick={toggleSidebar}
-          className="sm:hidden text-white focus:outline-none transition-all duration-300"
+          className="sm:hidden ml-4 text-white focus:outline-none transition-all duration-300"
+          aria-label="Toggle menu"
         >
           {sidebarOpen ? <X size={28} /> : <Menu size={28} />}
         </button>
@@ -69,20 +73,27 @@ export default function Navbar() {
 
       {/* Sidebar Drawer for Mobile */}
       {sidebarOpen && (
-        <div className="sm:hidden bg-blue-800 text-white px-9 py-4 flex flex-col gap-4 transition-all duration-300">
-          <button className="bg-blue-100 text-blue-600 font-bold px-3 py-2 rounded hover:bg-sky-700 hover:text-white transition">
+        <div className="sm:hidden bg-blue-800 text-white px-6 py-4 flex flex-col gap-3 transition-all duration-300">
+          <button className="bg-blue-100 text-blue-600 font-semibold px-3 py-1.5 rounded hover:bg-sky-700 hover:text-white transition whitespace-nowrap">
             Go to the report
           </button>
-          <button className="bg-blue-100 text-blue-600 font-bold px-1 py-2 rounded hover:bg-sky-700 hover:text-white transition">
+          <button className="bg-blue-100 text-blue-600 font-semibold px-3 py-1.5 rounded hover:bg-sky-700 hover:text-white transition whitespace-nowrap">
             Print
           </button>
           <button
             onClick={onShare}
-            className="bg-blue-100 text-blue-600 font-bold px-3 py-2 rounded hover:bg-sky-700 hover:text-white transition"
+            className="bg-blue-100 text-blue-600 font-semibold px-3 py-1.5 rounded hover:bg-sky-700 hover:text-white transition whitespace-nowrap"
           >
             Share
           </button>
-
+          {selectedArray.length > 0 && (
+            <button
+              onClick={onCancel}
+              className="bg-blue-100 text-blue-600 font-semibold px-3 py-1.5 rounded hover:bg-sky-700 hover:text-white transition whitespace-nowrap"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       )}
     </>
