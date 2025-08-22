@@ -1,21 +1,12 @@
 import MediaGrid from "./MediaGrid";
 
-export default function MediaGridServer() {
-  const dicomImages = [
-    { src: '/dicoms/brain.jpg', name: 'image1.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image2.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image3.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image4.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image5.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image6.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image7.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image8.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image9.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image10.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image11.dcm' },
-    { src: '/dicoms/brain.jpg', name: 'image12.dcm' },
-  ];
-  return (
-      <MediaGrid dicomImages={dicomImages}/>
-  )
+export default async function MediaGridServer() {
+    const DicomImagesData = await fetch('http://localhost:3001/fetchDetails/John Doe')
+    const dicomImagesJson = await DicomImagesData.json()
+    console.log(dicomImagesJson.DicomImages)
+    console.log(dicomImagesJson.patientDetailsArray)
+    //const dicomImages = dicomImagesJson["DicomImages"]
+    return (
+      <MediaGrid dicomImages={dicomImagesJson.DicomImages}/>
+    )
 }

@@ -1,0 +1,119 @@
+'use client';
+import { useEffect, useRef, useState } from 'react';
+import {
+  RenderingEngine,
+  imageLoader,
+  metaData,
+  type Types,
+} from '@cornerstonejs/core';
+import {
+  Enums,
+  addTool,
+  ToolGroupManager,
+  LengthTool,
+  PanTool,
+  ZoomTool,
+  RectangleROITool,
+  EllipticalROITool,
+} from '@cornerstonejs/tools';
+import { init as csRenderInit } from '@cornerstonejs/core';
+import ViewportType from '@cornerstonejs/core';
+import { init as csToolsInit } from '@cornerstonejs/tools';
+import { init as dicomImageLoaderInit } from '@cornerstonejs/dicom-image-loader';
+export default function Cornerstone3DViewer() {
+  const elementRef = useRef<HTMLDivElement | null>(null);
+  const [toolGroup, setToolGroup] = useState<ReturnType<typeof ToolGroupManager.createToolGroup> | null>(null);
+  const [measurement, setMeasurement] = useState<number | null>(null);
+  const renderingEngineId = 'myRenderingEngine';
+  const viewportId = 'CT';
+  const toolGroupId = 'MY_TOOL_GROUP';
+  useEffect(() => {
+    const setup = async () => {
+      await csRenderInit();
+      await csToolsInit();
+      dicomImageLoaderInit(); 
+      const imageId = `wadouri:${window.location.origin}/dicoms/image-000004.dcm`;
+      const imageIds = [imageId];
+      const renderingEngine = new RenderingEngine(renderingEngineId);
+      const viewportInput: Types.PublicViewportInput = {
+        viewportId,
+        type: 'stack',
+        element: elementRef.current!,
+        defaultOptions: {
+          background: [0, 0, 0],
+        },
+      };
+      renderingEngine.enableElement(viewportInput);
+      const viewport = renderingEngine.getViewport(viewportId) as Types.IStackViewport;
+      await imageLoader.loadAndCacheImage(imageId);
+      viewport.setStack(imageIds, 0);
+      viewport.render();
+      // Register tools
+      addTool(LengthTool);
+      addTool(RectangleROITool);
+      addTool(EllipticalROITool);
+      addTool(PanTool);
+      addTool(ZoomTool);
+      // Setup tool group
+      const existingToolGroup = ToolGroupManager.getToolGroup(toolGroupId) 
+      const tg = existingToolGroup ?? ToolGroupManager.createToolGroup(toolGroupId);
+      if(!tg){
+        console.error('Failed to create a tool group')
+        return
+      }
+      tg.addViewport(viewportId, renderingEngineId);
+      tg.addTool('Length');
+      tg.addTool('RectangleROI');
+      tg.addTool('EllipticalROI');
+      tg.addTool('Pan');
+      tg.addTool('Zoom');
+      tg.setToolActive('Pan', { bindings: [{ mouseButton: Enums.MouseBindings.Secondary }] });
+      tg.setToolActive('Zoom', { bindings: [{ mouseButton: Enums.MouseBindings.Wheel }] });
+      setToolGroup(tg);
+    };
+    setup();
+  }, []);
+  const activateTool = (toolName: string) => {
+    if (!toolGroup) return;
+    toolGroup.setToolActive(toolName, {
+      bindings: [{ mouseButton: Enums.MouseBindings.Primary }],
+    });
+  };
+  /*const getMeasurement = () => {
+    if (!toolGroup) return;
+    const toolState = toolGroup.getToolState('Length');
+    if (toolState?.length > 0) {
+      const last = toolState[toolState.length - 1];
+      const length = last.cachedStats?.length?.value;
+      if (length) {
+        console.log('Latest length:', length);
+        setMeasurement(length);
+      }
+    } else {
+      console.log('No measurements yet.');
+    }
+  };*/
+  return (
+    <div className="flex flex-col items-center justify-center h-screen gap-4 bg-black p-4">
+      <div
+        ref={elementRef}
+        className="w-[512px] h-[512px] border border-white"
+        style={{ backgroundColor: '#000' }}
+      ></div>
+      <div className="flex flex-wrap gap-2 text-white">
+        <button onClick={() => activateTool('Length')} className="px-3 py-1 bg-gray-800 rounded">
+          Length
+        </button>
+        <button onClick={() => activateTool('RectangleROI')} className="px-3 py-1 bg-gray-800 rounded">
+          Rectangle
+        </button>
+        <button onClick={() => activateTool('EllipticalROI')} className="px-3 py-1 bg-gray-800 rounded">
+          Ellipse
+        </button>
+      </div>
+      <div className="text-white text-lg">
+        Length: {measurement ? `${measurement.toFixed(2)} mm` : 'N/A'}
+      </div>
+    </div>
+  );
+}

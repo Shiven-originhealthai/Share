@@ -1,0 +1,230 @@
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
+import { Request } from 'express';
+import * as QRCode from 'qrcode';
+import * as otpGenerator from 'otp-generator';
+import { randomUUID } from 'crypto';
+import * as dicomParser from 'dicom-parser';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as nodemailer from 'nodemailer';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource, Repository } from 'typeorm';
+import { currentSession } from '../../patients/patient.entity';
+import { AppConfig } from '../config/app.config';
+import { selectedImage } from 'selected_image/selected-image-entity';
+
+
+interface CachedData {
+  fetched: any;
+}
+
+interface DicomImage {
+  src: string;
+  name: string;
+}
+
+const share_object: Record<string, boolean> = {};
+const otpStore: Record<string, string> = {};
+let DicomImages: DicomImage[] = [];
+const cached_data: CachedData = { fetched: null };
+
+@Injectable()
+export class ImageService {
+  constructor(
+    private readonly jwtService: JwtService,
+    @InjectRepository(currentSession)
+    private readonly currentSession: Repository<currentSession>,
+    @InjectRepository(selectedImage)
+    private readonly selectedImageRepository: Repository<selectedImage>,
+    private ds: DataSource
+  ) {}
+
+  generate_share_token(payload: any): string {
+    const fullpayload = {
+      ...payload,
+      jti: randomUUID(),
+      iat: Math.floor(Date.now() / 1000),
+    };
+    return this.jwtService.sign(fullpayload);
+  }
+
+  async generate_otp_sevice(length: number, token: string,accession_no:number): Promise<string> {
+    const otp = otpGenerator.generate(length, {
+      digits: true,
+      upperCaseAlphabets: false,
+      lowerCaseAlphabets: false,
+      specialChars: false,
+    });
+    otpStore[token] = otp;
+    const exists = await this.currentSession.findOne({ where: { token: token } });
+    console.log('accession no in generated otp service'+accession_no)
+    if(exists){
+      await this.ds.query(`update table current_session set OTP=${otp} `)
+    }
+    this.createPatientData(otp, token, accession_no, true);
+    return otp;
+  }
+
+  async generateQrCode(data: string): Promise<string> {
+    return QRCode.toDataURL(data, {
+      errorCorrectionLevel: 'H',
+      type: 'image/png',
+      margin: 1,
+      width: 300,
+    });
+  }
+
+  convert_to_base64(imageNames: string[]): void {
+    DicomImages = [];
+    imageNames.forEach((name) => {
+      const filePath = path.resolve(
+        `${AppConfig.dicomFolderPath}/dicom-capture-${name}.png`,
+      );
+
+      try {
+        const fileBuffer = fs.readFileSync(filePath);
+        const base64 = Buffer.from(fileBuffer).toString('base64');
+        DicomImages.push({
+          src: `data:image/jpeg;base64,${base64}`,
+          name: 'frame-1(2)',
+        });
+      } catch (error) {
+        console.error(`Error converting ${filePath}`, error);
+      }
+    });
+    console.log(DicomImages)
+  }
+
+  async read_process(req: Request) {
+    DicomImages = [];
+    await this.currentSession.clear();
+    //await this.selectedImageRepository.clear()
+    cached_data.fetched = req.body;
+    console.log(cached_data.fetched)
+    console.log('accession no '+cached_data.fetched.accession_no)
+    this.createselecteddata(cached_data.fetched.accession_no,cached_data.fetched.arr);
+
+   // 
+   // const serialId = cached_data.fetched.SerialId
+
+    const share_token = this.generate_share_token(cached_data);
+    share_object[share_token] = true;
+
+    const shareUrl = `http://localhost:3000/share/${share_token}`;
+    const qrCodeUrl = await this.generateQrCode(shareUrl);
+
+    return { success: true, qrCodeUrl, shareUrl };
+  }
+
+  async validate(token: string,accession_no:number): Promise<any> {
+    try {
+      const decoded = this.jwtService.verify(token);
+      const record = await this.currentSession.findOne({ where: { token } });
+      console.log('Record fetched from current sesion'+record)
+
+      if (record && record.Status) {
+        console.log('Condition true')
+        return { response: true, data: decoded, DicomImages };
+      }
+
+      if (record && !record.Status) {
+        console.log('Condition false')
+        return { response: false, otpRequired: true };
+      }
+      console.log('accession no in validate function'+accession_no)
+      const otp = this.generate_otp_sevice(4,token,accession_no)
+      console.log('OTP'+otp)
+      if(record){
+        await this.ds.query(`update table current_session set OTP = ${otp}`)
+      }
+      const selectedImages = await this.selectedImageRepository.findOne({ where: { accession_no : accession_no } });
+      console.log(selectedImages?.selected_image)
+      if(!selectedImages?.selected_image) return null
+      this.convert_to_base64(selectedImages?.selected_image);
+      return { response: false, otpRequired: true };
+    } catch {
+      return { response: false, error: 'invalid or expired token' };
+    }
+  }
+
+  async validate_otp(req: Request) {
+    const { token, enteredOtp } = req.body;
+    const record = await this.currentSession.findOne({ where: { token } });
+    if (!record) return { response: false, error: 'Invalid token' };
+
+    if (record.OTP === Number(enteredOtp)) {
+      record.Status = true;
+      await this.currentSession.save(record);
+      return { response: true };
+    }
+    return { response: false, error: 'Invalid OTP' };
+  }
+
+  email_images = async (req: Request) => {
+    const { email } = req.body;
+    if (!email) return { success: false, message: 'Email address is required' };
+
+    const attachments = DicomImages.map((img) => ({
+      filename: `${img.name}.jpg`,
+      content: img.src.split(',')[1],
+      encoding: 'base64',
+    }));
+
+    console.log('Email'+ AppConfig.email.user)
+    console.log('password'+ AppConfig.email.password)
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: AppConfig.email.user,
+        pass: AppConfig.email.password,
+      },
+    });
+
+    try {
+      await transporter.sendMail({
+        from: `"Share" <${AppConfig.email.user}>`,
+        to: email,
+        subject: 'Shared Images',
+        text: 'Please find the attached images.',
+        attachments,
+      });
+      return { success: true, message: 'Email sent successfully' };
+    } catch (err) {
+      console.error('Error sending mail:', err);
+      throw new InternalServerErrorException('Failed to send email');
+    }
+  };
+
+  async readdicomimage(filename: string) {
+    try {
+      const dicomFileAsBuffer = fs.readFileSync(`public/${filename}.dcm`);
+      const byteArray = new Uint8Array(dicomFileAsBuffer);
+      const dataSet = dicomParser.parseDicom(byteArray);
+
+      return {
+        patientName: dataSet.string('x00100010'),
+        studyDescription: dataSet.string('x00081030'),
+        sopInstanceUid: dataSet.string('x00080018'),
+      };
+    } catch (error) {
+      console.error('Error parsing DICOM file:', error);
+      throw new Error('Failed to parse DICOM file');
+    }
+  }
+
+  async createPatientData(
+    OTP: number,
+    token: string,
+    accession_no: number,
+    Status: boolean,
+  ) {
+    const data = this.currentSession.create({ OTP, token, Status,accession_no });
+    return this.currentSession.save(data);
+  }
+  async createselecteddata(accession_no:number,selected_image:string[]){
+      const data = this.selectedImageRepository.create({accession_no,selected_image})
+      return this.selectedImageRepository.save(data)
+  }
+
+}

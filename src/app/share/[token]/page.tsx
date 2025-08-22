@@ -8,118 +8,101 @@ import { useTokenSetter } from '@/store/Token';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Loading from '@/components/Loading';
-//Declaring the mobile media card prop which is used for rendering the images with their type
+// Declaring the mobile media card prop which is used for rendering the images with their type
 interface MobileMediaCardProps {
   src: string;
 }
-//This component is responsible for displaying the mobile media card where the selected images are put in  
+// This component is responsible for displaying the mobile media card where the selected images are put in
 const MobileMediaCard: React.FC<MobileMediaCardProps> = ({ src }) => {
   return (
-    <div className="rounded-xl shadow-md overflow-hidden">
-      <div className="w-full h-40 bg-black rounded-t-xl flex items-center justify-center" style={{ position: 'relative' }}>
-        <Image
-          src={src}
-          alt={src.split('/').pop() || 'image'}
-          fill
-          style={{ objectFit: 'contain' }}
-          className="rounded-t-xl"
-          sizes="(max-width: 640px) 100vw, 50vw"
-        />
-      </div>
-      <div className="p-2 text-center">
-        <p className="text-sm text-white-700">{src.split('/').pop()}</p>
+    <div className="rounded-xl overflow-hidden">
+      <div className="w-full h-60 bg-black rounded-t-xl flex items-center justify-center relative">
+        <img src={src} alt="" />
       </div>
     </div>
   );
 };
-
 function MobileDisplay({ selectedPaths }: { selectedPaths: string[] }) {
   return (
-    <div className="grid grid-cols-2 gap-4 w-full max-w-screen-sm mx-auto p-4 overflow-y-auto max-h-[80vh]" style={{ height: '80vh' }}>
+    <div className="grid grid-cols-4 gap-5 w-full max-w-screen-xl py-10 mx-auto">
       {selectedPaths.length > 0 ? (
         selectedPaths.map((src: string, idx: number) => (
           <MobileMediaCard key={idx} src={src} />
         ))
       ) : (
-        <p className="text-center col-span-2 text-gray-500">
+        <p className="text-center col-span-4 text-gray-500">
           No media selected. Please select on desktop.
         </p>
       )}
     </div>
   );
 }
-
-// Responsible for displaying the selected component 
+// Responsible for displaying the selected component
 export default function SelectedMobileMediaGrid() {
-  //const router = useRouter();
-  const selectedPaths = useMediaStore((state) => state.selectedPaths);
+  const [selectedPaths, setSelectedPaths] = useState<string[]>([])
   const [tokenFromUrl, setTokenFromUrl] = useState<string | undefined>(undefined);
   const [otp, setOtp] = useState('');
   const [otpError, setOtpError] = useState('');
   const [isOtpVerified, setIsOtpVerified] = useState(false);
   const [isTokenValid, setIsTokenValid] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-
-  //stores the token in the store
+  const isMobile = useIsMobile();
+  const [Updated, setUpdated] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const urlToken = window.location.pathname.split('/').pop();
       setTokenFromUrl(urlToken);
     }
   }, []);
-
-  // if the token is available then the token is back validated from backend 
   useEffect(() => {
     if (tokenFromUrl) {
       validateToken(tokenFromUrl);
     }
   }, [tokenFromUrl]);
-
-  // function for vaidating the token from backend
   async function validateToken(token: string) {
     try {
       const res = await fetch(`http://localhost:3001/images/share/${token}`);
       const data = await res.json();
+      console.log(!!data?.response)
       setIsTokenValid(!!data?.response);
+      console.log('Response' + data?.response)
+      console.log('DicomImages' + data?.DicomImages.src)
+      data?.DicomImages.forEach((elem: any) => {
+        setSelectedPaths((prevPaths) => [...prevPaths, elem.src]);
+        console.log(elem.src)
+      });
     } catch (err) {
       setIsTokenValid(false);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
-
-  // function for validating the otp validation
-  async function otp_validation(otpField: { enteredOtp: string, token: string }) {
+  async function otp_validation(otpField: { enteredOtp: string; token: string }) {
     const response = await fetch('http://localhost:3001/images/validateOtp', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(otpField)
+      body: JSON.stringify(otpField),
     });
     const received_json = await response.json();
     return received_json;
   }
-
-  // Handles otp submit function from the input entered 
   async function handleOtpSubmit(e: React.FormEvent) {
     e.preventDefault();
     setOtpError('');
-
     if (!otp.trim()) {
       setOtpError('Please enter OTP');
       return;
     }
-
     if (!tokenFromUrl) {
       setOtpError('Token missing. Please refresh the page.');
       return;
     }
-
     try {
       const isValid = await otp_validation({ enteredOtp: otp.trim(), token: tokenFromUrl });
-      if (isValid["response"]) {
+      if (isValid['response']) {
         setIsOtpVerified(true);
       } else {
-        setOtpError(isValid["Error"]);
+        setOtpError(isValid['Error']);
       }
     } catch (err) {
       setOtpError('Error verifying OTP. Please try again.');
@@ -132,8 +115,6 @@ export default function SelectedMobileMediaGrid() {
       </div>
     );
   }
-
-  // checks for is token valid where token is validated from backend  if not successfull renders below div 
   if (!isTokenValid) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -144,8 +125,6 @@ export default function SelectedMobileMediaGrid() {
       </div>
     );
   }
-
-  //checks for the condition is otp verified if yes would display code accordingly
   if (!isOtpVerified) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -172,7 +151,5 @@ export default function SelectedMobileMediaGrid() {
       </div>
     );
   }
-
-  // returns component on mobile display 
   return <MobileDisplay selectedPaths={selectedPaths} />;
 }
